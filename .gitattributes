@@ -1,0 +1,11 @@
+# Normalise line endings to LF in the repository; check out LF everywhere.
+* text=auto eol=lf
+
+# Binary assets that must never be converted.
+*.png  binary
+*.svg  binary
+*.ttf  binary
+*.wav  binary
+*.vst3 binary
+*.app  binary
+*.appex binary

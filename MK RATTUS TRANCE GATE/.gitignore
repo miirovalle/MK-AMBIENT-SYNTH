@@ -1,0 +1,20 @@
+# Build outputs
+build/
+build-*/
+out/
+cmake-build-*/
+
+# Plug-in bundles and binaries
+*.vst3/
+*.app/
+*.appex/
+*.exe
+*.dll
+*.lib
+*.pdb
+
+# Local JUCE checkout (MK_JUCE_SOURCE_DIR)
+JUCE/
+
+# macOS
+.DS_Store

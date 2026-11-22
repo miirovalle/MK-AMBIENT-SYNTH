@@ -1,0 +1,20 @@
+﻿# Build outputs
+build/
+build-*/
+out/
+cmake-build-*/
+
+# IDE
+.vs/
+.vscode/
+*.user
+
+# Render artefacts
+*.wav
+preset_report.txt
+presets.csv
+renders/
+ui-snapshots/
+
+# macOS
+.DS_Store
