@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "macOS deployment target")
-set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0" CACHE STRING "iOS deployment target")
+set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "17.0" CACHE STRING "iPadOS deployment target")
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
@@ -204,11 +204,11 @@ if (MK_BUILD_PLUGIN)
         foreach (target MKAmbient MKAmbient_Standalone MKAmbient_AUv3)
             if (TARGET ${target})
                 set_target_properties(${target} PROPERTIES
-                    # iPad only: the interface is laid out for a tablet and the
-                    # iPhone form factor would only shrink it.
+                    # iPad only, iPadOS 17 minimum: the interface is laid out for a
+                    # tablet, and 17 is the oldest OS the target iPad Pro runs.
                     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
                     XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST "NO"
-                    XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
+                    XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "17.0"
                     # Ship one slice: every iPad that runs iPadOS 17 is arm64, and fat
                     # binaries only cost download size and dyld work.
                     XCODE_ATTRIBUTE_ARCHS "arm64"

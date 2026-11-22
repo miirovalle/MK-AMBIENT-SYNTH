@@ -1,6 +1,6 @@
 # MK Ambient
 
-An epic, spacious ambient synthesizer built for **iPad (iPadOS / AUv3)**: lush analog pads,
+An epic, spacious ambient synthesizer built for **iPadOS 17 (AUv3 / touch-first)**: lush analog pads,
 cinematic swells, deep drones and four independently moving noise/texture layers.
 
 The audio engine is portable C++17 with **no third-party DSP dependencies**, so every part of
@@ -207,7 +207,7 @@ sustain pedal is still handled from MIDI directly.
 cmake -S . -B build-ios -G Xcode \
       -DCMAKE_SYSTEM_NAME=iOS \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
       -DMK_BUILD_PLUGIN=ON \
       -DMK_BUILD_TESTS=OFF -DMK_BUILD_RENDERER=OFF
 
@@ -219,8 +219,11 @@ open build-ios/MKAmbient.xcodeproj
    unique bundle id (default `com.mk.ambient`).
 2. Run the host app once on the iPad; the AUv3 extension is then available in GarageBand,
    AUM, Cubasis and any other AUv3 host.
-3. The app target is iPad-only (`TARGETED_DEVICE_FAMILY=2`), requires no microphone, network or
-   filesystem entitlements, and the AUv3 extension has no UI beyond the shared editor.
+3. The app is iPad-only (`TARGETED_DEVICE_FAMILY=2`) with **iPadOS 17** as the minimum, requires
+   no microphone, network or filesystem entitlements, and the AUv3 extension has no UI beyond the
+   shared editor. iPadOS 17 is the oldest release the target iPad Pro 10.5" (A10X) receives, so the
+   floor costs nothing; `IPHONEOS_DEPLOYMENT_TARGET=17.0` is set in
+   [CMakeLists.txt](CMakeLists.txt) and in the CI workflow.
 
 ### iPad build in CI (AUv3 + IPA)
 

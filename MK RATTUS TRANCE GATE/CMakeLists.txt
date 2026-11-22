@@ -68,6 +68,25 @@ target_link_libraries(MKRattusTranceGate PRIVATE
 target_include_directories(MKRattusTranceGate PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/Gate12/src/dsp")
 
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # iPad only, iPadOS 17 minimum, arm64 only - same targets as MK Ambient.
+    # juce_add_plugin creates a SharedCode target plus one per format, so the
+    # settings must be applied to the app and the appex as well.
+    foreach(target MKRattusTranceGate MKRattusTranceGate_Standalone MKRattusTranceGate_AUv3)
+        if(TARGET ${target})
+            set_target_properties(${target} PROPERTIES
+                XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
+                XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST "NO"
+                XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "17.0"
+                XCODE_ATTRIBUTE_ARCHS "arm64"
+                XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH "NO"
+                XCODE_ATTRIBUTE_VALID_ARCHS "arm64"
+                XCODE_ATTRIBUTE_ENABLE_TESTABILITY "NO"
+                XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "3")
+        endif()
+    endforeach()
+endif()
+
 if(TARGET MKRattusTranceGate_VST3)
     add_custom_command(TARGET MKRattusTranceGate_VST3 POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory
