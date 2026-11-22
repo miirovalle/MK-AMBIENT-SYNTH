@@ -207,7 +207,7 @@ sustain pedal is still handled from MIDI directly.
 cmake -S . -B build-ios -G Xcode \
       -DCMAKE_SYSTEM_NAME=iOS \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
+      -DCMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET=17.0 \
       -DMK_BUILD_PLUGIN=ON \
       -DMK_BUILD_TESTS=OFF -DMK_BUILD_RENDERER=OFF
 
