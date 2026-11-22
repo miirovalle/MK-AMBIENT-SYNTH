@@ -1,4 +1,4 @@
-﻿# Build outputs
+# Build outputs
 build/
 build-*/
 out/
@@ -18,3 +18,6 @@ ui-snapshots/
 
 # macOS
 .DS_Store
+
+# Downloaded CI artifacts
+ipa/

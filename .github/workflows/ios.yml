@@ -15,6 +15,12 @@ name: iOS (AUv3 + IPA)
 on:
   push:
     branches: [main, master]
+    # Do not spend macOS runner minutes on documentation-only pushes.
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitattributes"
   pull_request:
   workflow_dispatch:
 
