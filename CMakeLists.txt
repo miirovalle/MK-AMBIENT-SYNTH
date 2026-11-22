@@ -133,6 +133,7 @@ if (MK_BUILD_PLUGIN)
         FORMATS Standalone VST3 AU AUv3
         MICROPHONE_PERMISSION_ENABLED FALSE
         HARDENED_RUNTIME_ENABLED TRUE
+        IPAD_SCREEN_ORIENTATIONS UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
     )
 
     target_sources(MKAmbient PRIVATE
