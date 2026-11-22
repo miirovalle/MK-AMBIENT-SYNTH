@@ -197,20 +197,30 @@ if (MK_BUILD_PLUGIN)
             JUCE_HAS_LIBMP3 FALSE
             JUCE_IOS TRUE
         )
-        set_target_properties(MKAmbient PROPERTIES
-            XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
-            XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST "NO"
-            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
-            # Ship one slice: every iPad that runs iPadOS 17 is arm64, and fat
-            # binaries only cost download size and dyld work.
-            XCODE_ATTRIBUTE_ARCHS "arm64"
-            XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH "NO"
-            XCODE_ATTRIBUTE_VALID_ARCHS "arm64"
-            XCODE_ATTRIBUTE_ENABLE_TESTABILITY "NO"
-            XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING "YES"
-            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "3"
-            XCODE_ATTRIBUTE_GCC_SYMBOLS_PRIVATE_EXTERN "YES"
-            XCODE_ATTRIBUTE_CLANG_LTO "YES"
-        )
+        # juce_add_plugin generates a separate SharedCode target plus one target per
+        # format, so the build settings have to be applied to the app and the appex
+        # as well - setting them on MKAmbient alone leaves the app shipping as
+        # iPhone+iPad with a default (Os) optimisation level.
+        foreach (target MKAmbient MKAmbient_Standalone MKAmbient_AUv3)
+            if (TARGET ${target})
+                set_target_properties(${target} PROPERTIES
+                    # iPad only: the interface is laid out for a tablet and the
+                    # iPhone form factor would only shrink it.
+                    XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "2"
+                    XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST "NO"
+                    XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
+                    # Ship one slice: every iPad that runs iPadOS 17 is arm64, and fat
+                    # binaries only cost download size and dyld work.
+                    XCODE_ATTRIBUTE_ARCHS "arm64"
+                    XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH "NO"
+                    XCODE_ATTRIBUTE_VALID_ARCHS "arm64"
+                    XCODE_ATTRIBUTE_ENABLE_TESTABILITY "NO"
+                    XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING "YES"
+                    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "3"
+                    XCODE_ATTRIBUTE_GCC_SYMBOLS_PRIVATE_EXTERN "YES"
+                    XCODE_ATTRIBUTE_CLANG_LTO "YES"
+                )
+            endif()
+        endforeach()
     endif()
 endif()

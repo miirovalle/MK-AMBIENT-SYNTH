@@ -49,7 +49,7 @@ jobs:
       SIGNING_AVAILABLE: ${{ secrets.BUILD_CERTIFICATE_BASE64 != '' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Select the newest installed Xcode
         run: |
@@ -177,14 +177,14 @@ jobs:
             "auv3/$(basename "$APPEX_PATH").zip"
 
       - name: Upload IPA
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.product.slug }}-ipa
           path: ${{ matrix.product.slug }}-ios.ipa
           if-no-files-found: error
 
       - name: Upload AUv3 extension
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.product.slug }}-auv3
           path: auv3/*.zip
