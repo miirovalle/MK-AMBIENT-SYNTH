@@ -141,6 +141,7 @@ if (MK_BUILD_PLUGIN)
         Source/Plugin/PluginEditor.cpp
         Source/UI/Theme.cpp
         Source/UI/Knob.cpp
+        Source/UI/Keyboard.cpp
         Source/UI/GateEditor.cpp
         Source/UI/Panels.cpp
     )
@@ -179,6 +180,7 @@ if (MK_BUILD_PLUGIN)
             Source/Plugin/PluginEditor.cpp
             Source/UI/Theme.cpp
             Source/UI/Knob.cpp
+            Source/UI/Keyboard.cpp
             Source/UI/GateEditor.cpp
             Source/UI/Panels.cpp
         )

@@ -173,6 +173,25 @@ int main (int argc, char** argv)
     processor.processBlock (pedalUpBlock, pedalUp);
     check (processor.engine.heldVoiceCount() == 0, "pedal up releases the deferred note");
 
+    // ---- on-screen keyboard reaches the engine -----------------------------
+    processor.engine.allNotesOff (true);
+
+    processor.keyboardNoteOn (60, 0.9f);
+    juce::AudioBuffer<float> keyboardBlock (2, 256);
+    keyboardBlock.clear();
+    juce::MidiBuffer noHostMidi;
+    processor.processBlock (keyboardBlock, noHostMidi);
+    check (processor.engine.heldVoiceCount() == 1, "on-screen keyboard note is held");
+    check (keyboardBlock.getMagnitude (0, keyboardBlock.getNumSamples()) > 0.0f,
+           "on-screen keyboard note produces audio");
+
+    processor.keyboardNoteOff (60);
+    juce::AudioBuffer<float> keyboardRelease (2, 256);
+    keyboardRelease.clear();
+    juce::MidiBuffer emptyHostMidi;
+    processor.processBlock (keyboardRelease, emptyHostMidi);
+    check (processor.engine.heldVoiceCount() == 0, "on-screen keyboard release frees the note");
+
     // ---- state round-trip --------------------------------------------------
     juce::MemoryBlock state;
     processor.getStateInformation (state);
@@ -189,6 +208,11 @@ int main (int argc, char** argv)
     check (processor.apvts.getParameter ("gateMix") != nullptr, "gate mix parameter exists");
     check (processor.apvts.getParameter ("gateLength") != nullptr, "gate length parameter exists");
 
+    // ---- section on/off switches are host-visible ---------------------------
+    for (const char* key : { "oscAOn", "oscBOn", "slot1On", "slot2On", "slot3On", "slot4On",
+                             "lfo1On", "lfo2On", "lfo3On", "delayOn", "reverbOn", "ensembleOn", "gateOn" })
+        check (processor.apvts.getParameter (key) != nullptr, "section switch exists");
+
     processor.releaseResources();
 
     // ---- offscreen UI snapshots -------------------------------------------
@@ -197,11 +221,8 @@ int main (int argc, char** argv)
         const juce::File outputDir { juce::String (argv[1]) };
         outputDir.createDirectory();
 
-        auto writeSnapshot = [&outputDir] (juce::Component& page, const juce::String& fileName)
+        auto writeImage = [&outputDir] (const juce::Image& image, const juce::String& fileName)
         {
-            page.setSize (1164, 674);
-            page.setVisible (true);
-            const auto image = page.createComponentSnapshot (page.getLocalBounds(), true, 1.0f);
             const auto file = outputDir.getChildFile (fileName + ".png");
             file.deleteFile();
             juce::FileOutputStream stream (file);
@@ -210,6 +231,23 @@ int main (int argc, char** argv)
                 std::printf ("  wrote %s\n", file.getFullPathName().toRawUTF8());
             else
                 std::printf ("  FAILED to write %s\n", file.getFullPathName().toRawUTF8());
+        };
+
+        auto writeSnapshot = [&writeImage] (juce::Component& page, const juce::String& fileName)
+        {
+            page.setSize (1164, 656);
+            page.setVisible (true);
+
+            // Pages are transparent (the editor paints behind them), so give
+            // the snapshot the editor backdrop to make it reviewable.
+            const auto snapshot = page.createComponentSnapshot (page.getLocalBounds(), true, 1.0f);
+            juce::Image image (juce::Image::ARGB, page.getWidth(), page.getHeight(), true);
+            {
+                juce::Graphics g (image);
+                g.fillAll (mk::ui::col::background);
+                g.drawImageAt (snapshot, 0, 0);
+            }
+            writeImage (image, fileName);
         };
 
         mk::ui::PadPage padPage (processor.apvts);
@@ -229,6 +267,16 @@ int main (int argc, char** argv)
         writeSnapshot (spacePage, "page_space");
         writeSnapshot (gatePage, "page_gate");
         writeSnapshot (presetPage, "page_presets");
+
+        // Whole interface (header, tabs, page and keyboard) plus a thumbnail of
+        // it, so the layout can be reviewed without opening a plug-in host.
+        if (std::unique_ptr<juce::AudioProcessorEditor> editor { processor.createEditor() })
+        {
+            editor->setSize (1200, 900);
+            const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+            writeImage (image, "editor");
+            writeImage (image.rescaled (480, 360, juce::Graphics::highResamplingQuality), "thumbnail");
+        }
     }
 
     std::printf ("\n%s\n", failures == 0 ? "SMOKE TEST PASS" : "SMOKE TEST FAIL");

@@ -37,6 +37,8 @@ juce::String formatValue (const ParamSpec& spec, float value)
             return (value > 0.0f ? "+" : "") + juce::String (juce::roundToInt (value)) + " st";
         case U_Cent:
             return juce::String (juce::roundToInt (value)) + " ct";
+        case U_Switch:
+            return value > 0.5f ? "On" : "Off";
         case U_None:
         default:
             return juce::String (juce::roundToInt (value));
@@ -166,6 +168,56 @@ void PluginProcessor::renderChunk (juce::AudioBuffer<float>& buffer, int startSa
     }
 }
 
+void PluginProcessor::keyboardNoteOn (int note, float velocity)
+{
+    int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+    keyboardFifo.prepareToWrite (1, start1, size1, start2, size2);
+
+    if (size1 + size2 <= 0)
+        return; // UI pushed faster than the audio thread drained: drop the event.
+
+    auto& event = keyboardEvents[(size_t) (size1 > 0 ? start1 : start2)];
+    event.note = juce::jlimit (0, 127, note);
+    event.velocity = juce::jlimit (0.0f, 1.0f, velocity);
+    event.on = true;
+    keyboardFifo.finishedWrite (1);
+}
+
+void PluginProcessor::keyboardNoteOff (int note)
+{
+    int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+    keyboardFifo.prepareToWrite (1, start1, size1, start2, size2);
+
+    if (size1 + size2 <= 0)
+        return;
+
+    auto& event = keyboardEvents[(size_t) (size1 > 0 ? start1 : start2)];
+    event.note = juce::jlimit (0, 127, note);
+    event.velocity = 0.0f;
+    event.on = false;
+    keyboardFifo.finishedWrite (1);
+}
+
+void PluginProcessor::mergeKeyboardNotes (juce::MidiBuffer& midiMessages)
+{
+    const int ready = keyboardFifo.getNumReady();
+    if (ready <= 0)
+        return;
+
+    int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+    keyboardFifo.prepareToRead (ready, start1, size1, start2, size2);
+
+    for (int i = 0; i < size1 + size2; ++i)
+    {
+        const auto& event = keyboardEvents[(size_t) (i < size1 ? start1 + i : start2 + (i - size1))];
+        midiMessages.addEvent (event.on ? juce::MidiMessage::noteOn (1, event.note, event.velocity)
+                                        : juce::MidiMessage::noteOff (1, event.note),
+                               0);
+    }
+
+    keyboardFifo.finishedRead (size1 + size2);
+}
+
 void PluginProcessor::handleMidiMessage (const juce::MidiMessage& message)
 {
     if (message.isNoteOn())
@@ -210,6 +262,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
+
+    mergeKeyboardNotes (midiMessages);
 
     // Push host automation into the engine's lock-free parameter store.
     for (int i = 0; i < kParamCount; ++i)

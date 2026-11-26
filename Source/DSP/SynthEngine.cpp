@@ -212,7 +212,7 @@ int SynthEngine::heldVoiceCount() const noexcept
 GateSettings SynthEngine::makeGateSettings (const ParamSnapshot& p) const noexcept
 {
     GateSettings s;
-    s.mix = p[(size_t) P::GateMix];
+    s.mix = p[(size_t) P::GateMix] * p[(size_t) P::GateOn];
     s.minLevel = p[(size_t) P::GateMin];
     s.maxLevel = p[(size_t) P::GateMax];
     s.tension = p[(size_t) P::GateTension];
@@ -325,9 +325,9 @@ void SynthEngine::renderBlock (float* left, float* right, int numSamples)
         const int len = std::min (kControlBlockSize, numSamples - done);
         const float dt = (float) len / (float) sr;
 
-        lfoValues[0] = globalLfos[0].advance (dt);
-        lfoValues[1] = globalLfos[1].advance (dt);
-        lfoValues[2] = globalLfos[2].advance (dt);
+        lfoValues[0] = globalLfos[0].advance (dt) * p[(size_t) P::Lfo1On];
+        lfoValues[1] = globalLfos[1].advance (dt) * p[(size_t) P::Lfo2On];
+        lfoValues[2] = globalLfos[2].advance (dt) * p[(size_t) P::Lfo3On];
 
         const float cutoffMod = p[(size_t) P::Lfo1Cutoff] * lfoValues[0]
                               + p[(size_t) P::Lfo2Cutoff] * lfoValues[1]
@@ -350,8 +350,8 @@ void SynthEngine::renderBlock (float* left, float* right, int numSamples)
         vc.waveB = (int) p[(size_t) P::OscBWave];
         vc.posA = p[(size_t) P::OscAPos];
         vc.posB = p[(size_t) P::OscBPos];
-        vc.levelA = p[(size_t) P::OscALevel] * padLevel;
-        vc.levelB = p[(size_t) P::OscBLevel] * padLevel;
+        vc.levelA = p[(size_t) P::OscALevel] * padLevel * p[(size_t) P::OscAOn];
+        vc.levelB = p[(size_t) P::OscBLevel] * padLevel * p[(size_t) P::OscBOn];
         vc.unisonA = (int) p[(size_t) P::OscAUnison];
         vc.unisonB = (int) p[(size_t) P::OscBUnison];
         vc.detuneA = clampf (p[(size_t) P::OscADetune] + detuneMod * 18.0f, 0.0f, 100.0f);
@@ -442,7 +442,8 @@ void SynthEngine::renderBlock (float* left, float* right, int numSamples)
     }
 
     // ---- pad bus: ensemble width -------------------------------------------
-    ensemble.setParams (p[(size_t) P::EnsembleDepth], p[(size_t) P::EnsembleRate]);
+    ensemble.setParams (p[(size_t) P::EnsembleDepth] * p[(size_t) P::EnsembleOn],
+                        p[(size_t) P::EnsembleRate]);
     ensemble.process (padL.data(), padR.data(), numSamples);
 
     // ---- delay return ------------------------------------------------------
@@ -451,8 +452,8 @@ void SynthEngine::renderBlock (float* left, float* right, int numSamples)
                      p[(size_t) P::DelayMod], p[(size_t) P::DelayMode] > 0.5f);
     delay.process (delaySendL.data(), delaySendR.data(), delayWetL.data(), delayWetR.data(), numSamples);
 
-    const float delayMix = p[(size_t) P::DelayMix];
-    const float revMix = p[(size_t) P::ReverbMix];
+    const float delayMix = p[(size_t) P::DelayMix] * p[(size_t) P::DelayOn];
+    const float revMix = p[(size_t) P::ReverbMix] * p[(size_t) P::ReverbOn];
 
     for (int i = 0; i < numSamples; ++i)
     {

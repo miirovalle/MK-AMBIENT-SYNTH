@@ -25,6 +25,7 @@ void ParamStore::prepare (double sampleRate) noexcept
             case U_Hz:  seconds = 0.04f; break;
             case U_Ms:  seconds = 0.05f; break;
             case U_Sec: seconds = 0.03f; break;
+            case U_Switch: seconds = 0.015f; break;
             default:    seconds = 0.02f; break;
         }
 

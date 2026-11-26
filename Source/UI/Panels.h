@@ -25,15 +25,23 @@ public:
     void addKnob (mk::P id, const juce::String& label, bool bipolar = false);
     void addChoice (mk::P id, const juce::String& label);
 
+    // Adds an on/off switch to the right of the card title. The optional
+    // caption is shown left of the switch when the parameter name alone would
+    // be ambiguous.
+    void addToggle (mk::P id, const juce::String& caption = {});
+
     void paint (juce::Graphics& g) override;
     void resized() override;
 
 private:
+    juce::Rectangle<int> headerBounds() const;
+
     juce::AudioProcessorValueTreeState& apvts;
     juce::String cardTitle;
     int columns;
     juce::OwnedArray<Knob> knobs;
     juce::OwnedArray<ChoiceButton> choices;
+    juce::OwnedArray<Toggle> toggles;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Card)
 };

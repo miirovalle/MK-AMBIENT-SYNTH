@@ -33,18 +33,33 @@ void Card::addChoice (mk::P id, const juce::String& label)
     addAndMakeVisible (choice);
 }
 
+void Card::addToggle (mk::P id, const juce::String& caption)
+{
+    auto* toggle = toggles.add (new Toggle (paramRef (apvts, id), caption));
+    addAndMakeVisible (toggle);
+}
+
+juce::Rectangle<int> Card::headerBounds() const
+{
+    return getLocalBounds().reduced (10, 6).removeFromTop (24);
+}
+
 void Card::paint (juce::Graphics& g)
 {
     drawPanelBackground (g, getLocalBounds().toFloat());
 
-    auto titleArea = getLocalBounds().reduced (12, 7).removeFromTop (18);
+    auto header = headerBounds();
+    auto titleArea = header.withTrimmedLeft (11); // clear of the corner screw
+    for (auto* toggle : toggles)
+        titleArea.setRight (juce::jmin (titleArea.getRight(), toggle->getX() - 4));
+
     g.setColour (col::accent);
     g.setFont (font (12.0f, true));
     g.drawText (cardTitle, titleArea, juce::Justification::centredLeft, false);
 
     g.setColour (col::lineSoft);
-    g.drawLine ((float) titleArea.getX(), (float) titleArea.getBottom() + 2.0f,
-                (float) titleArea.getRight(), (float) titleArea.getBottom() + 2.0f, 1.0f);
+    g.drawLine ((float) header.getX(), (float) header.getBottom() + 1.0f,
+                (float) header.getRight(), (float) header.getBottom() + 1.0f, 1.0f);
 
     drawScrew (g, { 10.0f, 10.0f });
     drawScrew (g, { (float) getWidth() - 10.0f, (float) getHeight() - 10.0f });
@@ -52,8 +67,17 @@ void Card::paint (juce::Graphics& g)
 
 void Card::resized()
 {
+    auto header = headerBounds();
+
+    for (int i = toggles.size(); --i >= 0;)
+    {
+        const int width = juce::jmin (toggles[i]->getPreferredWidth(), header.getWidth() / 2);
+        toggles[i]->setBounds (header.removeFromRight (width));
+        header.removeFromRight (6);
+    }
+
     auto area = getLocalBounds().reduced (11, 9);
-    area.removeFromTop (20);
+    area.removeFromTop (28);
 
     for (auto* choice : choices)
     {
@@ -70,8 +94,9 @@ void Card::resized()
     const int cellHeight = area.getHeight() / rows;
 
     // Keep knobs at a comfortable touch size and centre the whole grid inside
-    // the card instead of stretching cells to the full card height.
-    const int knobHeight = juce::jmin (cellHeight - 2, 150);
+    // the card instead of stretching cells to the full card height. The grid
+    // never grows past its cell, so a short card can never overlap rows.
+    const int knobHeight = juce::jlimit (36, 150, cellHeight - 2);
     const int blockHeight = rows * knobHeight;
     const int startY = area.getY() + juce::jmax (0, (area.getHeight() - blockHeight) / 2);
 
@@ -82,7 +107,7 @@ void Card::resized()
         knobs[i]->setBounds (area.getX() + column * cellWidth + 1,
                              startY + row * knobHeight,
                              cellWidth - 2,
-                             juce::jmax (48, knobHeight));
+                             knobHeight);
     }
 }
 
@@ -99,6 +124,7 @@ PadPage::PadPage (juce::AudioProcessorValueTreeState& s)
       voice (s, "VOICE", 2),
       quick (s, "SPACE QUICK", 2)
 {
+    oscA.addToggle (mk::P::OscAOn);
     oscA.addChoice (mk::P::OscAWave, "WAVE");
     oscA.addKnob (mk::P::OscAPos, "SHAPE");
     oscA.addKnob (mk::P::OscALevel, "LEVEL");
@@ -106,6 +132,7 @@ PadPage::PadPage (juce::AudioProcessorValueTreeState& s)
     oscA.addKnob (mk::P::OscADetune, "DETUNE");
     oscA.addKnob (mk::P::OscASpread, "SPREAD");
 
+    oscB.addToggle (mk::P::OscBOn);
     oscB.addChoice (mk::P::OscBWave, "WAVE");
     oscB.addChoice (mk::P::OscBInterval, "INTERVAL");
     oscB.addKnob (mk::P::OscBPos, "SHAPE");
@@ -187,6 +214,7 @@ TexturePage::TexturePage (juce::AudioProcessorValueTreeState& s)
     {
         auto* card = slots.add (new Card (s, "SLOT " + juce::String (i + 1), 3));
 
+        card->addToggle (mk::slotParam (i, mk::kSlotEnableOffset));
         card->addChoice (mk::slotParam (i, 0), "SOURCE");
         card->addChoice (mk::slotParam (i, 2), "MODE");
         card->addChoice (mk::slotParam (i, 4), "FILTER");
@@ -245,13 +273,14 @@ ModPage::ModPage (juce::AudioProcessorValueTreeState& s)
     {
         auto* card = lfos.add (new Card (s, "LFO " + juce::String (i + 1), 2));
 
-        card->addChoice (mk::P ((int) mk::P::Lfo1Shape + i * 7), "SHAPE");
-        card->addKnob (mk::P ((int) mk::P::Lfo1Rate + i * 7), "RATE");
-        card->addKnob (mk::P ((int) mk::P::Lfo1Cutoff + i * 7), "> CUTOFF");
-        card->addKnob (mk::P ((int) mk::P::Lfo1Detune + i * 7), "> DETUNE");
-        card->addKnob (mk::P ((int) mk::P::Lfo1Blend + i * 7), "> BLEND");
-        card->addKnob (mk::P ((int) mk::P::Lfo1Pan + i * 7), "> PAN");
-        card->addKnob (mk::P ((int) mk::P::Lfo1Space + i * 7), "> SPACE");
+        card->addToggle (mk::lfoParam (i, mk::kLfoEnableOffset));
+        card->addChoice (mk::lfoParam (i, 1), "SHAPE");
+        card->addKnob (mk::lfoParam (i, 0), "RATE");
+        card->addKnob (mk::lfoParam (i, 2), "> CUTOFF");
+        card->addKnob (mk::lfoParam (i, 3), "> DETUNE");
+        card->addKnob (mk::lfoParam (i, 4), "> BLEND");
+        card->addKnob (mk::lfoParam (i, 5), "> PAN");
+        card->addKnob (mk::lfoParam (i, 6), "> SPACE");
 
         addAndMakeVisible (card);
     }
@@ -276,6 +305,7 @@ SpacePage::SpacePage (juce::AudioProcessorValueTreeState& s)
       reverb (s, "SPACE REVERB", 3),
       master (s, "WIDTH & MASTER", 3)
 {
+    delay.addToggle (mk::P::DelayOn);
     delay.addChoice (mk::P::DelayMode, "MODE");
     delay.addKnob (mk::P::DelayTimeL, "TIME L");
     delay.addKnob (mk::P::DelayTimeR, "TIME R");
@@ -284,6 +314,7 @@ SpacePage::SpacePage (juce::AudioProcessorValueTreeState& s)
     delay.addKnob (mk::P::DelayMix, "MIX");
     delay.addKnob (mk::P::DelayMod, "MOTION");
 
+    reverb.addToggle (mk::P::ReverbOn);
     reverb.addKnob (mk::P::ReverbSize, "SIZE");
     reverb.addKnob (mk::P::ReverbDecay, "DECAY");
     reverb.addKnob (mk::P::ReverbDamp, "DAMPING");
@@ -291,6 +322,7 @@ SpacePage::SpacePage (juce::AudioProcessorValueTreeState& s)
     reverb.addKnob (mk::P::ReverbWidth, "WIDTH");
     reverb.addKnob (mk::P::ReverbMix, "MIX");
 
+    master.addToggle (mk::P::EnsembleOn, "ENSEMBLE");
     master.addKnob (mk::P::EnsembleDepth, "ENSEMBLE");
     master.addKnob (mk::P::EnsembleRate, "ENS RATE");
     master.addKnob (mk::P::PadSpace, "PAD SEND");
@@ -325,6 +357,7 @@ GatePage::GatePage (juce::AudioProcessorValueTreeState& s, GateHostContext conte
       timing (s, "TIMING & TARGET", 2),
       editor (std::make_unique<GateEditor> (s, std::move (context)))
 {
+    controls.addToggle (mk::P::GateOn);
     controls.addChoice (mk::P::GateTarget, "TARGET");
     controls.addKnob (mk::P::GateMix, "MIX");
     controls.addKnob (mk::P::GatePhase, "PHASE");

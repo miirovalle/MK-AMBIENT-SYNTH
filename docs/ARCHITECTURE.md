@@ -19,7 +19,7 @@
 ```
 Source/DSP
   MkCommon.h        math, PRNG (seeded xorshift), pan, smoothing, sine table
-  Params.h/.cpp     144-parameter table, registry, choice lists, slot block helpers
+  Params.h/.cpp     180-parameter table, registry, choice lists, slot/LFO block helpers
   ParamStore.h/.cpp atomic targets + audio-thread smoothing + snapshot
   Filters.h/.cpp    TPT state-variable filter, multimode voice filter, one-pole, biquad,
                     power-of-two delay line with Hermite reads, all-pass diffuser
@@ -41,15 +41,16 @@ Source/DSP
 
 Source/UI
   Theme.*           olive-gray palette, panel drawing, popup look-and-feel
-  Knob.*            Knob (custom gesture handling), ChoiceButton (grouped menus), Meter,
-                    SimpleButton
+  Knob.*            Knob (custom gesture handling), ChoiceButton (grouped menus), Toggle,
+                    Meter, SimpleButton
+  Keyboard.*        on-screen piano keyboard: multi-touch, glissando, 7-octave scroll bar
   GateEditor.*      step sequencer widget: pattern strip, paint/point drag, snap, undo/redo,
                     playhead, DSP-accurate preview curve
   Panels.*          Card grid container and the six pages
 
 Source/Plugin
-  PluginProcessor.* APVTS bridge, MIDI/sustain handling, programs, state
-  PluginEditor.*    header, tab bar, pages, metering
+  PluginProcessor.* APVTS bridge, MIDI/sustain handling, keyboard FIFO, programs, state
+  PluginEditor.*    scaled 4:3 canvas: header, tab bar, pages, keyboard, metering
 
 Tests/              assertion suite (registry, filters, generators, effects, engine)
 Tools/              offline renderer + numpy analysis
@@ -178,14 +179,36 @@ position spray, pitch jitter and a slow drift through the sample.
 
 ## UI structure
 
-`PluginEditor` owns the header (title, program display, previous/next, output meter), five tabs
-and the pages. `Card` lays out its choice buttons and knobs in a grid, so a page only declares
-the grouping. Knobs implement their own drag (210 px full travel, ×0.22 with shift), double-tap
-reset and wheel support, and talk to the host through `juce::ParameterAttachment` (proper
-gesture begin/end for automation).
+`PluginEditor` owns the header (title, program display, previous/next, output meter), the tab
+strip and the pages. The interface is laid out exactly once in **design coordinates**
+(1200 × 900, a 4:3 iPad screen) on a `Canvas` child; `resized()` scales that canvas with an
+`AffineTransform` to whatever space the window or the AUv3 host provides and centres it. A
+small window, Split View or a full iPad therefore show *the same* complete interface, never a
+clipped corner, and every control keeps its proportions and touch size relative to the screen.
+
+`Card` lays out its choice buttons and knobs in a grid, so a page only declares the grouping.
+Knobs implement their own drag (210 px full travel, ×0.22 with shift), double-tap reset and
+wheel support, and talk to the host through `juce::ParameterAttachment` (proper gesture
+begin/end for automation). The grid never lets a knob row overflow its cell, so short cards
+shrink their knobs instead of overlapping.
+
+`Card::addToggle` puts an on/off switch in the card header. Each switch is a normal float
+parameter of unit `U_Switch` (0..1, default 1), so it is automatable, saved with the patch and
+smoothed by `ParamStore` over 15 ms — switching a section fades rather than clicks. The DSP
+multiplies the section's own gain by the switch value, so: `OscAOn`/`OscBOn` scale the
+oscillator levels, `Lfo1On…Lfo3On` scale the LFO output, `Slot1On…Slot4On` scale the slot level,
+`DelayOn`/`ReverbOn` scale the return mixes, `EnsembleOn` scales the ensemble depth and
+`GateOn` scales the gate mix. Everything defaults to on, so existing programs are unchanged.
 
 `ChoiceButton` builds grouped popup menus from the parameter's value strings — the 138-entry
 source list becomes seven sub-menus (procedural + six texture families).
+
+`Keyboard` is the small piano roll along the bottom of the editor: 73 keys (C1–C7) at 34 px per
+white key with a scroll bar whenever the range is wider than the window. Each touch source gets
+its own pointer, so chords and glissando work on the iPad; note events are pushed into a
+`juce::AbstractFifo` and turned into MIDI by `PluginProcessor` on the audio thread, which keeps
+voice state off the message thread. Because it sits outside the pages it stays playable on every
+tab.
 
 `GateEditor` draws twelve nodes over a 12-column grid, a DSP-accurate envelope curve, step bars
 and a moving playhead (30 Hz from engine atomics). Dragging in Point mode writes one step param
@@ -215,7 +238,10 @@ into that store. The host sees `Init` + 100 programs; the editor shows them 12 p
 ## Extension points
 
 * **New parameter** — add one `X(...)` line to `Params.h`; registry, APVTS, UI and preset
-  snapshots pick it up. Add it to a card to expose it.
+  snapshots pick it up. Add it to a card to expose it. A parameter in a slot or LFO block must go
+  in the matching offset (see `kSlotStride` / `kLfoStride`), which `static_assert`s enforce.
+* **New section switch** — add an `X(...)` line with unit `U_Switch` next to its section's
+  parameters, multiply that section's gain by it in the DSP, and call `card.addToggle (id)`.
 * **New preset** — add a family builder plus a `Family` row (name, category, description, five
   suffixes, six-source texture pool, build function). That yields five new programs at once.
 * **New wavetable family** — add a spectral model in `Wavetables.cpp::harmonicAmplitude` and a
@@ -233,8 +259,8 @@ into that store. The host sees `Init` + 100 programs; the editor shows them 12 p
 
 | thread | responsibility |
 |---|---|
-| audio | `SynthEngine::process`, parameter smoothing, metering atomics |
-| message (UI/host) | APVTS edits, program loads (targets only), editor repaint at 30 Hz |
+| audio | `SynthEngine::process`, parameter smoothing, metering atomics, draining the keyboard FIFO into MIDI |
+| message (UI/host) | APVTS edits, program loads (targets only), editor repaint at 30 Hz, pushing on-screen keyboard notes into the FIFO |
 | construction | wavetable build + sample generation inside `prepare()` |
 
 ## Performance notes for iPad

@@ -205,7 +205,8 @@ void NoiseEngine::render (float* outL, float* outR, float* delayL, float* delayR
     {
         SlotControls c;
         c.sourceIndex = (int) p[(size_t) slotParam (s, 0)];
-        c.level = p[(size_t) slotParam (s, 1)] * globalLevel;
+        c.level = p[(size_t) slotParam (s, 1)] * globalLevel
+                * p[(size_t) slotParam (s, kSlotEnableOffset)];
         c.mode = (int) p[(size_t) slotParam (s, 2)];
         c.tuneSemitones = p[(size_t) slotParam (s, 3)];
         c.filterType = (int) p[(size_t) slotParam (s, 4)];

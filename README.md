@@ -42,11 +42,55 @@ is an original 12-step amp sequencer, while MK RATTUS TRANCE GATE links the GPL-
   attack and release, phase offset, and Sync / Free / Note triggering. Targets the pad, the
   textures or both.
 * **Touch-first UI** — monochrome olive-gray hardware look, 80 px+ knobs with vertical drag,
-  fine drag on shift, double-tap to reset defaults, grouped source menus, 30 Hz metering.
+  fine drag on shift, double-tap to reset defaults, grouped source menus, 30 Hz metering. The
+  whole interface is laid out once at 1200 × 900 and **scaled to fit** whatever the window or
+  AUv3 host gives it, so nothing is ever clipped; on/off switches in every card header bypass
+  the oscillators, texture slots, LFOs, delay, reverb, ensemble and gate.
+* **On-screen keyboard** — a small piano roll along the bottom of the editor (C1–C7, horizontal
+  scroll bar) for playing the synth straight from the plug-in: multi-touch chords, glissando,
+  and note labels on every C. It stays visible on all pages and feeds the engine through a
+  lock-free FIFO, so it is safe with the audio thread.
 
 **101 host programs: `Init` plus 100 ambient presets**, including the five flagship patches
 (*Submerged Drone*, *Distant Rain / Wind Pad*, *Worn Tape Chord*, *Glass / Shimmer Pluck*,
 *Evolving Granular Texture*).
+
+---
+
+## Interface
+
+![MK Ambient interface](ui-snapshots/thumbnail.png)
+
+**It scales.** The editor is designed once on a 1200 × 900 (4:3, iPad) canvas and that canvas
+is transformed to fit the window or the AUv3 host view, so a 640 × 480 window, Split View on an
+iPad and a full 12.9" screen all show the complete interface — same layout, same proportions, no
+clipped control. Desktop windows resize with a locked 4:3 aspect; hosts may hand the editor any
+size and the spare space is letterboxed.
+
+**Every section can be switched off** from the header of its card:
+
+| switch | card | what it bypasses |
+|---|---|---|
+| `Osc A On` / `Osc B On` | OSC A, OSC B | that oscillator's level (the other one keeps sounding) |
+| `Slot 1 On` … `Slot 4 On` | SLOT 1–4 | that texture layer's output and sends |
+| `LFO 1 On` … `LFO 3 On` | LFO 1–3 | that LFO's modulation output |
+| `Delay On` | STEREO DELAY | the delay return |
+| `Space On` | SPACE REVERB | the reverb return |
+| `Ensemble On` | WIDTH & MASTER | the ensemble/chorus width |
+| `Gate On` | GATE | the trance-gate mix (pattern and steps keep their values) |
+
+Each switch is an ordinary automatable parameter (`oscAOn`, `slot3On`, …) that defaults to on and
+is smoothed over 15 ms, so switching fades instead of clicking, and presets or existing sessions
+keep the old sound. Because it scales the section's own gain, a switch never resets the controls
+behind it — flip it back and the patch is exactly as it was.
+
+**Play it from the plug-in.** A small keyboard sits along the bottom of the editor on every page:
+73 keys from C1 to C7 at 34 px per white key, with a horizontal scroll bar (and mouse-wheel /
+trackpad scrolling) whenever the range is wider than the window. Touching slides between keys
+(glissando), each finger holds its own note for chords, and the C keys are labelled. Notes go
+through `PluginProcessor::keyboardNoteOn/Off` into a lock-free FIFO that is merged into the MIDI
+stream on the audio thread, so the sustain pedal, gate triggering and voice stealing all behave
+exactly as with an external controller.
 
 ---
 
@@ -192,11 +236,11 @@ seconds of audio through the hosted instance. Verified output:
 ```
 found: MK Ambient by MK (0 in / 0 out)
 buses: 0 in / 2 out, main output 2 ch, layout supported 1
-VST3 parameter count 146 (engine 144, missing 0, duplicated 0)
-3 s through the hosted VST3: peak 0.093
+VST3 parameter count 182 (engine 180, missing 0, duplicated 0)
+3 s through the hosted VST3: peak 0.092
 ```
 
-144 automatable parameters + 2 VST3 system parameters; MIDI-CC parameter emulation is disabled
+180 automatable parameters + 2 VST3 system parameters; MIDI-CC parameter emulation is disabled
 (`JUCE_VST3_EMULATE_MIDI_CC_WITH_PARAMETERS=0`) so host automation lists stay clean — the
 sustain pedal is still handled from MIDI directly.
 
@@ -362,8 +406,8 @@ MIDI ─► voice allocator ─► 16 pad voices ─► pad bus ─► ensemble 
 * `Source/DSP/*` — portable engine (no JUCE): params, filters, wavetables, oscillators,
   envelopes, LFOs, noise, sample library/player, effects, trance gate, voice, noise engine,
   synth engine, presets (20 families × 5 variations).
-* `Source/UI/*` — theme, touch widgets (knob, choice, meter, button), the gate step editor and
-  the six pages.
+* `Source/UI/*` — theme, touch widgets (knob, toggle, choice, meter, button, on-screen
+  keyboard), the gate step editor and the six pages.
 * `Source/Plugin/*` — `AudioProcessor` wrapper, APVTS bridge, tempo/transport, programs, state.
 
 ## Assets

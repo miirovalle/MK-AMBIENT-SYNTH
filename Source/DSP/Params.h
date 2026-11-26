@@ -37,7 +37,10 @@ enum Unit
     U_Db,
     U_Semi,
     U_Cent,
-    U_Ms
+    U_Ms,
+    // Continuous 0..1 on/off. Deliberately not stepped so the parameter store
+    // smooths it: switching a section fades instead of clicking.
+    U_Switch
 };
 
 struct ChoiceList
@@ -62,6 +65,16 @@ extern const ChoiceList kGateTargetChoices;
 
 // Number of steps in the trance gate pattern.
 constexpr int kGateSteps = 12;
+
+// Every slot exposes the same contiguous block of parameters, starting at its
+// Source. The last entry is the slot's on/off switch.
+constexpr int kSlotStride = 18;
+constexpr int kSlotEnableOffset = kSlotStride - 1;
+
+// Every global LFO exposes the same contiguous block, starting at its Rate.
+// The last entry is the LFO's on/off switch.
+constexpr int kLfoStride = 8;
+constexpr int kLfoEnableOffset = kLfoStride - 1;
 
 // Six procedural noise types followed by the short-texture sample catalogue.
 // Catalogue names are static; only the sample data is generated at prepare time.
@@ -93,12 +106,14 @@ struct ParamSpec
 // ---------------------------------------------------------------------------
 #define MK_PARAM_TABLE(X)                                                                                    \
     X (PadLevel,       "padLevel",      "Pad Level",       Pad,      0,      1,       0.80f,  U_Pct,  nullptr) \
+    X (OscAOn,         "oscAOn",        "Osc A On",        Pad,      0,      1,       1,      U_Switch, nullptr) \
     X (OscAWave,       "oscAWave",      "Osc A Wave",      Pad,      0,      5,       1,      U_None, &kWaveChoices) \
     X (OscAPos,        "oscAPos",       "Osc A Shape",     Pad,      0,      1,       0.35f,  U_Pct,  nullptr) \
     X (OscALevel,      "oscALevel",     "Osc A Level",     Pad,      0,      1,       0.75f,  U_Pct,  nullptr) \
     X (OscAUnison,     "oscAUnison",    "Osc A Unison",    Pad,      1,      7,       5,      U_None, nullptr) \
     X (OscADetune,     "oscADetune",    "Osc A Detune",    Pad,      0,      40,      12,     U_Cent, nullptr) \
     X (OscASpread,     "oscASpread",    "Osc A Spread",    Pad,      0,      1,       0.70f,  U_Pct,  nullptr) \
+    X (OscBOn,         "oscBOn",        "Osc B On",        Pad,      0,      1,       1,      U_Switch, nullptr) \
     X (OscBWave,       "oscBWave",      "Osc B Wave",      Pad,      0,      5,       2,      U_None, &kWaveChoices) \
     X (OscBPos,        "oscBPos",       "Osc B Shape",     Pad,      0,      1,       0.50f,  U_Pct,  nullptr) \
     X (OscBLevel,      "oscBLevel",     "Osc B Level",     Pad,      0,      1,       0.40f,  U_Pct,  nullptr) \
@@ -134,6 +149,7 @@ struct ParamSpec
     X (Lfo1Blend,      "lfo1Blend",     "LFO 1 > Blend",  Mod,     0,      1,       0.15f,  U_Pct,  nullptr) \
     X (Lfo1Pan,        "lfo1Pan",       "LFO 1 > Pan",    Mod,     0,      1,       0.30f,  U_Pct,  nullptr) \
     X (Lfo1Space,      "lfo1Space",     "LFO 1 > Space",  Mod,     0,      1,       0.20f,  U_Pct,  nullptr) \
+    X (Lfo1On,         "lfo1On",        "LFO 1 On",       Mod,     0,      1,       1,      U_Switch, nullptr) \
     X (Lfo2Rate,       "lfo2Rate",      "LFO 2 Rate",     Mod,     0.005f, 10,      0.05f,  U_Hz,   nullptr) \
     X (Lfo2Shape,      "lfo2Shape",     "LFO 2 Shape",    Mod,     0,      6,       6,      U_None, &kLfoShapeChoices) \
     X (Lfo2Cutoff,     "lfo2Cutoff",    "LFO 2 > Cutoff", Mod,     0,      1,       0,      U_Pct,  nullptr) \
@@ -141,6 +157,7 @@ struct ParamSpec
     X (Lfo2Blend,      "lfo2Blend",     "LFO 2 > Blend",  Mod,     0,      1,       0,      U_Pct,  nullptr) \
     X (Lfo2Pan,        "lfo2Pan",       "LFO 2 > Pan",    Mod,     0,      1,       0,      U_Pct,  nullptr) \
     X (Lfo2Space,      "lfo2Space",     "LFO 2 > Space",  Mod,     0,      1,       0.30f,  U_Pct,  nullptr) \
+    X (Lfo2On,         "lfo2On",        "LFO 2 On",       Mod,     0,      1,       1,      U_Switch, nullptr) \
     X (Lfo3Rate,       "lfo3Rate",      "LFO 3 Rate",     Mod,     0.005f, 10,      0.22f,  U_Hz,   nullptr) \
     X (Lfo3Shape,      "lfo3Shape",     "LFO 3 Shape",    Mod,     0,      6,       5,      U_None, &kLfoShapeChoices) \
     X (Lfo3Cutoff,     "lfo3Cutoff",    "LFO 3 > Cutoff", Mod,     0,      1,       0,      U_Pct,  nullptr) \
@@ -148,6 +165,7 @@ struct ParamSpec
     X (Lfo3Blend,      "lfo3Blend",     "LFO 3 > Blend",  Mod,     0,      1,       0,      U_Pct,  nullptr) \
     X (Lfo3Pan,        "lfo3Pan",       "LFO 3 > Pan",    Mod,     0,      1,       0,      U_Pct,  nullptr) \
     X (Lfo3Space,      "lfo3Space",     "LFO 3 > Space",  Mod,     0,      1,       0,      U_Pct,  nullptr) \
+    X (Lfo3On,         "lfo3On",        "LFO 3 On",       Mod,     0,      1,       1,      U_Switch, nullptr) \
                                                                                                               \
     X (NoiseLevel,     "noiseLevel",    "Texture Level",  Noise,   0,      1,       0.60f,  U_Pct,  nullptr) \
     X (GrainSize,      "grainSize",     "Grain Size",     Noise,   20,     300,     90,     U_Ms,   nullptr) \
@@ -169,6 +187,7 @@ struct ParamSpec
     X (Slot1LfoPan,    "slot1LfoPan",   "S1 LFO > Pan",   Noise,   0,      1,       0.20f,  U_Pct,  nullptr) \
     X (Slot1LfoSpace,  "slot1LfoSpace", "S1 LFO > Space", Noise,   0,      1,       0.15f,  U_Pct,  nullptr) \
     X (Slot1Swell,     "slot1Swell",    "Slot 1 Swell",   Noise,   0,      20,      3,      U_Sec,  nullptr) \
+    X (Slot1On,        "slot1On",       "Slot 1 On",      Noise,   0,      1,       1,      U_Switch, nullptr) \
     X (Slot2Source,    "slot2Source",   "Slot 2 Source",  Noise,   0,      137,     0,      U_None, &slotSourceChoices()) \
     X (Slot2Level,     "slot2Level",    "Slot 2 Level",   Noise,   0,      1,       0,      U_Pct,  nullptr) \
     X (Slot2Mode,      "slot2Mode",     "Slot 2 Mode",    Noise,   0,      2,       0,      U_None, &kSlotModeChoices) \
@@ -186,6 +205,7 @@ struct ParamSpec
     X (Slot2LfoPan,    "slot2LfoPan",   "S2 LFO > Pan",   Noise,   0,      1,       0.20f,  U_Pct,  nullptr) \
     X (Slot2LfoSpace,  "slot2LfoSpace", "S2 LFO > Space", Noise,   0,      1,       0.15f,  U_Pct,  nullptr) \
     X (Slot2Swell,     "slot2Swell",    "Slot 2 Swell",   Noise,   0,      20,      4,      U_Sec,  nullptr) \
+    X (Slot2On,        "slot2On",       "Slot 2 On",      Noise,   0,      1,       1,      U_Switch, nullptr) \
     X (Slot3Source,    "slot3Source",   "Slot 3 Source",  Noise,   0,      137,     0,      U_None, &slotSourceChoices()) \
     X (Slot3Level,     "slot3Level",    "Slot 3 Level",   Noise,   0,      1,       0,      U_Pct,  nullptr) \
     X (Slot3Mode,      "slot3Mode",     "Slot 3 Mode",    Noise,   0,      2,       0,      U_None, &kSlotModeChoices) \
@@ -203,6 +223,7 @@ struct ParamSpec
     X (Slot3LfoPan,    "slot3LfoPan",   "S3 LFO > Pan",   Noise,   0,      1,       0.20f,  U_Pct,  nullptr) \
     X (Slot3LfoSpace,  "slot3LfoSpace", "S3 LFO > Space", Noise,   0,      1,       0.15f,  U_Pct,  nullptr) \
     X (Slot3Swell,     "slot3Swell",    "Slot 3 Swell",   Noise,   0,      20,      5,      U_Sec,  nullptr) \
+    X (Slot3On,        "slot3On",       "Slot 3 On",      Noise,   0,      1,       1,      U_Switch, nullptr) \
     X (Slot4Source,    "slot4Source",   "Slot 4 Source",  Noise,   0,      137,     0,      U_None, &slotSourceChoices()) \
     X (Slot4Level,     "slot4Level",    "Slot 4 Level",   Noise,   0,      1,       0,      U_Pct,  nullptr) \
     X (Slot4Mode,      "slot4Mode",     "Slot 4 Mode",    Noise,   0,      2,       0,      U_None, &kSlotModeChoices) \
@@ -220,7 +241,9 @@ struct ParamSpec
     X (Slot4LfoPan,    "slot4LfoPan",   "S4 LFO > Pan",   Noise,   0,      1,       0.20f,  U_Pct,  nullptr) \
     X (Slot4LfoSpace,  "slot4LfoSpace", "S4 LFO > Space", Noise,   0,      1,       0.15f,  U_Pct,  nullptr) \
     X (Slot4Swell,     "slot4Swell",    "Slot 4 Swell",   Noise,   0,      20,      6,      U_Sec,  nullptr) \
+    X (Slot4On,        "slot4On",       "Slot 4 On",      Noise,   0,      1,       1,      U_Switch, nullptr) \
                                                                                                               \
+    X (DelayOn,        "delayOn",       "Delay On",       Space,   0,      1,       1,      U_Switch, nullptr) \
     X (DelayTimeL,     "delayTimeL",    "Delay L",        Space,   10,     2000,    420,    U_Ms,   nullptr) \
     X (DelayTimeR,     "delayTimeR",    "Delay R",        Space,   10,     2000,    560,    U_Ms,   nullptr) \
     X (DelayFeedback,  "delayFeedback", "Delay Feedback", Space,   0,      0.92f,   0.42f,  U_Pct,  nullptr) \
@@ -228,16 +251,19 @@ struct ParamSpec
     X (DelayMix,       "delayMix",      "Delay Mix",      Space,   0,      1,       0.25f,  U_Pct,  nullptr) \
     X (DelayMod,       "delayMod",      "Delay Motion",   Space,   0,      1,       0.25f,  U_Pct,  nullptr) \
     X (DelayMode,      "delayMode",     "Delay Mode",     Space,   0,      1,       0,      U_None, &kDelayModeChoices) \
+    X (ReverbOn,       "reverbOn",      "Space On",       Space,   0,      1,       1,      U_Switch, nullptr) \
     X (ReverbSize,     "reverbSize",    "Space Size",     Space,   0,      1,       0.65f,  U_Pct,  nullptr) \
     X (ReverbDecay,    "reverbDecay",   "Space Decay",    Space,   0,      1,       0.55f,  U_Pct,  nullptr) \
     X (ReverbDamp,     "reverbDamp",    "Space Damping",  Space,   0,      1,       0.45f,  U_Pct,  nullptr) \
     X (ReverbPredelay, "reverbPredelay","Pre-Delay",      Space,   0,      200,     30,     U_Ms,   nullptr) \
     X (ReverbWidth,    "reverbWidth",   "Space Width",    Space,   0,      1,       0.90f,  U_Pct,  nullptr) \
     X (ReverbMix,      "reverbMix",     "Space Mix",      Space,   0,      1,       0.50f,  U_Pct,  nullptr) \
+    X (EnsembleOn,     "ensembleOn",    "Ensemble On",    Space,   0,      1,       1,      U_Switch, nullptr) \
     X (EnsembleDepth,  "ensembleDepth", "Ensemble Depth", Space,   0,      1,       0.35f,  U_Pct,  nullptr) \
     X (EnsembleRate,   "ensembleRate",  "Ensemble Rate",  Space,   0.05f,  3,       0.35f,  U_Hz,   nullptr) \
     X (PadSpace,       "padSpace",      "Pad > Space",    Space,   0,      1,       0.35f,  U_Pct,  nullptr) \
                                                                                                               \
+    X (GateOn,         "gateOn",        "Gate On",        Gate,    0,      1,       1,      U_Switch, nullptr) \
     X (GateMix,        "gateMix",       "Gate Mix",       Gate,    0,      1,       0,      U_Pct,  nullptr) \
     X (GateTrigger,    "gateTrigger",   "Gate Trigger",   Gate,    0,      2,       0,      U_None, &kGateTriggerChoices) \
     X (GateLength,     "gateLength",    "Gate Length",    Gate,    0,      5,       1,      U_None, &kGateLengthChoices) \
@@ -298,6 +324,9 @@ float sanitiseParam (P p, float value) noexcept;
 
 // Per-slot parameter lookup helpers used by the noise engine and the UI.
 P slotParam (int slot, int offsetFromSource);
+
+// Per-LFO parameter lookup: 0 = Rate .. 6 = Space, kLfoEnableOffset = on/off.
+P lfoParam (int index, int offsetFromRate);
 
 // Step parameter of the trance gate (0 .. kGateSteps-1).
 P gateStepParam (int index);

@@ -156,7 +156,8 @@ const char* unitSuffix (Unit unit) noexcept
         case U_Semi: return " st";
         case U_Cent: return " ct";
         case U_Ms:   return " ms";
-        case U_None: return "";
+        case U_None:   return "";
+        case U_Switch: return "";
     }
     return "";
 }
@@ -167,13 +168,17 @@ const char* unitSuffix (Unit unit) noexcept
 
 namespace
 {
-// Every slot exposes the same 17 contiguous parameters, starting at Source.
-constexpr int kSlotStride = 17;
-
+// Every slot exposes the same contiguous parameters, starting at Source and
+// ending with its on/off switch.
 static_assert ((int) P::Slot2Source - (int) P::Slot1Source == kSlotStride, "slot parameter block must be contiguous");
 static_assert ((int) P::Slot3Source - (int) P::Slot2Source == kSlotStride, "slot parameter block must be contiguous");
 static_assert ((int) P::Slot4Source - (int) P::Slot3Source == kSlotStride, "slot parameter block must be contiguous");
-static_assert ((int) P::Slot1Swell - (int) P::Slot1Source == kSlotStride - 1, "slot block must end at Swell");
+static_assert ((int) P::Slot1Swell - (int) P::Slot1Source == kSlotStride - 2, "slot block must end at Swell + On");
+static_assert ((int) P::Slot1On - (int) P::Slot1Source == kSlotEnableOffset, "slot enable must be the last entry");
+
+static_assert ((int) P::Lfo2Rate - (int) P::Lfo1Rate == kLfoStride, "LFO parameter block must be contiguous");
+static_assert ((int) P::Lfo3Rate - (int) P::Lfo2Rate == kLfoStride, "LFO parameter block must be contiguous");
+static_assert ((int) P::Lfo1On - (int) P::Lfo1Rate == kLfoEnableOffset, "LFO enable must be the last entry");
 } // namespace
 
 P slotParam (int slot, int offsetFromSource)
@@ -181,6 +186,13 @@ P slotParam (int slot, int offsetFromSource)
     const int clampedSlot = clampValue (slot, 0, kNoiseSlotCount - 1);
     const int offset = clampValue (offsetFromSource, 0, kSlotStride - 1);
     return (P) ((int) P::Slot1Source + clampedSlot * kSlotStride + offset);
+}
+
+P lfoParam (int index, int offsetFromRate)
+{
+    const int clampedIndex = clampValue (index, 0, 2);
+    const int offset = clampValue (offsetFromRate, 0, kLfoStride - 1);
+    return (P) ((int) P::Lfo1Rate + clampedIndex * kLfoStride + offset);
 }
 
 P gateStepParam (int index)

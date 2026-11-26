@@ -20,24 +20,51 @@ PluginEditor::PluginEditor (PluginProcessor& owner)
 {
     setLookAndFeel (&lookAndFeel);
 
+    addAndMakeVisible (canvas);
+
     for (auto* tab : { &tabPad, &tabTextures, &tabMod, &tabSpace, &tabGate, &tabPresets })
-        addAndMakeVisible (tab);
+        canvas.addAndMakeVisible (tab);
 
-    addAndMakeVisible (previousButton);
-    addAndMakeVisible (nextButton);
-    addAndMakeVisible (outputMeter);
+    canvas.addAndMakeVisible (previousButton);
+    canvas.addAndMakeVisible (nextButton);
+    canvas.addAndMakeVisible (outputMeter);
+    canvas.addAndMakeVisible (keyboard);
 
-    addChildComponent (padPage);
-    addChildComponent (texturePage);
-    addChildComponent (modPage);
-    addChildComponent (spacePage);
-    addChildComponent (gatePage);
-    addChildComponent (presetPage);
+    canvas.addChildComponent (padPage);
+    canvas.addChildComponent (texturePage);
+    canvas.addChildComponent (modPage);
+    canvas.addChildComponent (spacePage);
+    canvas.addChildComponent (gatePage);
+    canvas.addChildComponent (presetPage);
 
+    // The interface is designed once and scaled to fit, so the window may be
+    // any size from a small laptop window to a full iPad screen. On iPad the
+    // AUv3 host decides the size, so the editor does not constrain it.
+   #if JUCE_IOS
+    setResizable (false, false);
+   #else
     setResizable (true, true);
-    setResizeLimits (960, 660, 1800, 1250);
-    getConstrainer()->setFixedAspectRatio (1200.0 / 820.0);
-    setSize (1200, 820);
+    setResizeLimits (600, 450, 2400, 1800);
+    if (auto* boundsConstrainer = getConstrainer())
+        boundsConstrainer->setFixedAspectRatio ((double) kDesignWidth / (double) kDesignHeight);
+   #endif
+
+    // Open at the design size, or smaller if the screen is smaller, so the
+    // window always fits.
+    int initialWidth = kDesignWidth;
+    int initialHeight = kDesignHeight;
+
+    if (const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+    {
+        const auto userArea = display->userArea;
+        const float fit = juce::jmin (1.0f,
+                                      juce::jmin ((float) userArea.getWidth() * 0.92f / (float) kDesignWidth,
+                                                  (float) userArea.getHeight() * 0.92f / (float) kDesignHeight));
+        initialWidth = juce::jmax (600, juce::roundToInt ((float) kDesignWidth * fit));
+        initialHeight = juce::jmax (450, juce::roundToInt ((float) kDesignHeight * fit));
+    }
+
+    setSize (initialWidth, initialHeight);
 
     showPage (0);
     startTimerHz (30);
@@ -45,6 +72,7 @@ PluginEditor::PluginEditor (PluginProcessor& owner)
 
 PluginEditor::~PluginEditor()
 {
+    keyboard.releaseAllNotes();
     setLookAndFeel (nullptr);
 }
 
@@ -72,21 +100,24 @@ void PluginEditor::showPage (int index)
 
 void PluginEditor::paint (juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
+    // Letterbox behind the scaled canvas.
+    g.fillAll (ui::col::shadow);
+}
+
+void PluginEditor::paintCanvas (juce::Graphics& g)
+{
+    auto bounds = juce::Rectangle<float> ((float) kDesignWidth, (float) kDesignHeight);
 
     juce::ColourGradient backgroundGradient (ui::col::backgroundHi, 0.0f, 0.0f,
                                              ui::col::background, 0.0f, bounds.getBottom(), false);
     g.setGradientFill (backgroundGradient);
-    g.fillAll();
+    g.fillRect (bounds);
 
     // Vignette for depth.
     juce::ColourGradient vignette (juce::Colours::transparentBlack, bounds.getCentreX(), bounds.getCentreY(),
                                    ui::col::shadow.withAlpha (0.55f), 0.0f, 0.0f, true);
     g.setGradientFill (vignette);
     g.fillRect (bounds);
-
-    const int headerHeight = 74;
-    const int tabHeight = 46;
 
     // Title block
     g.setColour (ui::col::text);
@@ -99,7 +130,7 @@ void PluginEditor::paint (juce::Graphics& g)
                 juce::Justification::centredLeft, false);
 
     // Preset display
-    auto presetArea = juce::Rectangle<int> (getWidth() / 2 - 190, 12, 380, 50);
+    auto presetArea = juce::Rectangle<int> (kDesignWidth / 2 - 190, 12, 380, 50);
     g.setColour (ui::col::panelDeep);
     g.fillRoundedRectangle (presetArea.toFloat(), 6.0f);
     g.setColour (ui::col::lineSoft);
@@ -118,13 +149,13 @@ void PluginEditor::paint (juce::Graphics& g)
     // Header meter label
     g.setColour (ui::col::textFaint);
     g.setFont (ui::font (9.0f));
-    g.drawText ("OUT", getWidth() - 158, 20, 40, 12, juce::Justification::centredLeft, false);
+    g.drawText ("OUT", kDesignWidth - 158, 20, 40, 12, juce::Justification::centredLeft, false);
 
     // Separators
     g.setColour (ui::col::lineSoft.withAlpha (0.7f));
-    g.drawLine (0.0f, (float) headerHeight, (float) getWidth(), (float) headerHeight, 1.0f);
-    g.drawLine (0.0f, (float) (headerHeight + tabHeight), (float) getWidth(),
-                (float) (headerHeight + tabHeight), 1.0f);
+    g.drawLine (0.0f, (float) kHeaderHeight, (float) kDesignWidth, (float) kHeaderHeight, 1.0f);
+    g.drawLine (0.0f, (float) (kHeaderHeight + kTabHeight), (float) kDesignWidth,
+                (float) (kHeaderHeight + kTabHeight), 1.0f);
 
     // Page caption on the right of the tab strip
     static const char* pageNames[] = { "VOICE & FILTER", "FOUR TEXTURE LAYERS", "MODULATION MATRIX",
@@ -132,35 +163,55 @@ void PluginEditor::paint (juce::Graphics& g)
                                        "FACTORY PROGRAMS" };
     g.setColour (ui::col::textFaint);
     g.setFont (ui::font (10.0f));
-    g.drawText (pageNames[juce::jlimit (0, 5, currentPage)], getWidth() - 360, headerHeight + 14, 340, 16,
+    g.drawText (pageNames[juce::jlimit (0, 5, currentPage)], kDesignWidth - 360, kHeaderHeight + 14, 340, 16,
                 juce::Justification::centredRight, false);
 
     // Screws in the outer corners
-    ui::drawScrew (g, { 10.0f, (float) getHeight() - 10.0f });
-    ui::drawScrew (g, { (float) getWidth() - 10.0f, 10.0f });
+    ui::drawScrew (g, { 10.0f, (float) kDesignHeight - 10.0f });
+    ui::drawScrew (g, { (float) kDesignWidth - 10.0f, 10.0f });
 }
 
 void PluginEditor::resized()
 {
-    const int headerHeight = 74;
-    const int tabHeight = 46;
+    // Scale the fixed design to the space we have been given, keeping the
+    // aspect ratio so every control stays visible and correctly proportioned.
+    const auto area = getLocalBounds().toFloat();
+    const float scale = juce::jmin (area.getWidth() / (float) kDesignWidth,
+                                    area.getHeight() / (float) kDesignHeight);
+    const float offsetX = (area.getWidth() - (float) kDesignWidth * scale) * 0.5f;
+    const float offsetY = (area.getHeight() - (float) kDesignHeight * scale) * 0.5f;
 
-    previousButton.setBounds (getWidth() - 330, 22, 44, 34);
-    nextButton.setBounds (getWidth() - 280, 22, 44, 34);
-    outputMeter.setBounds (getWidth() - 200, 32, 150, 16);
+    canvas.setBounds (0, 0, kDesignWidth, kDesignHeight);
+    canvas.setTransform (juce::AffineTransform::scale (juce::jmax (0.05f, scale))
+                             .translated (offsetX, offsetY));
+
+    layoutCanvas();
+}
+
+void PluginEditor::layoutCanvas()
+{
+    const int width = kDesignWidth;
+
+    previousButton.setBounds (width - 330, 22, 44, 34);
+    nextButton.setBounds (width - 280, 22, 44, 34);
+    outputMeter.setBounds (width - 200, 32, 150, 16);
 
     const int tabWidth = 132;
     int x = 18;
     for (auto* tab : { &tabPad, &tabTextures, &tabMod, &tabSpace, &tabGate, &tabPresets })
     {
-        tab->setBounds (x, headerHeight + 7, tabWidth, tabHeight - 14);
+        tab->setBounds (x, kHeaderHeight + 7, tabWidth, kTabHeight - 14);
         x += tabWidth + 6;
     }
 
     const int margin = 18;
-    auto content = juce::Rectangle<int> (margin, headerHeight + tabHeight + 10,
-                                         getWidth() - 2 * margin,
-                                         getHeight() - headerHeight - tabHeight - 26);
+
+    keyboard.setBounds (margin, kDesignHeight - 10 - kKeyboardHeight,
+                        width - 2 * margin, kKeyboardHeight);
+
+    const int pageTop = kHeaderHeight + kTabHeight + 10;
+    auto content = juce::Rectangle<int> (margin, pageTop, width - 2 * margin,
+                                         keyboard.getY() - 10 - pageTop);
 
     padPage.setBounds (content);
     texturePage.setBounds (content);

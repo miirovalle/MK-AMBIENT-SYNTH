@@ -65,6 +65,35 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChoiceButton)
 };
 
+// Compact on/off switch used in card headers. The caption is drawn to the left
+// of the switch and is part of the hit area, so the whole label taps.
+class Toggle : public juce::Component
+{
+public:
+    Toggle (juce::RangedAudioParameter& parameter, juce::String captionText = {});
+
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent&) override { pressed = true; repaint(); }
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent&) override { hover = true; repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { hover = false; pressed = false; repaint(); }
+
+    bool isOn() const noexcept { return value > 0.5f; }
+    int getPreferredWidth() const;
+
+private:
+    static constexpr int kPillWidth = 54;
+    static constexpr int kPillHeight = 22;
+
+    juce::RangedAudioParameter& param;
+    juce::ParameterAttachment attachment;
+    juce::String caption;
+    float value = 1.0f;
+    bool hover = false, pressed = false;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Toggle)
+};
+
 class SimpleButton : public juce::Component
 {
 public:

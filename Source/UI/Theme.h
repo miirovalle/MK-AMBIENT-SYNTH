@@ -25,6 +25,9 @@ namespace col
     inline const juce::Colour led          { 0xffd6cc86 };
     inline const juce::Colour shadow       { 0xff191a15 };
     inline const juce::Colour warn         { 0xffc09a5a };
+    // Ivory keys for the on-screen keyboard, kept warm to match the panel.
+    inline const juce::Colour ivory        { 0xffd3cfba };
+    inline const juce::Colour ivoryShade   { 0xff9d9a86 };
 }
 
 juce::Font font (float height, bool bold = false);

@@ -286,6 +286,94 @@ void ChoiceButton::showMenu()
 }
 
 // ---------------------------------------------------------------------------
+// Toggle
+// ---------------------------------------------------------------------------
+
+Toggle::Toggle (juce::RangedAudioParameter& parameter, juce::String captionText)
+    : param (parameter),
+      attachment (parameter,
+                  [this] (float newValue)
+                  {
+                      value = clamp01 (param.convertTo0to1 (newValue));
+                      repaint();
+                  }),
+      caption (std::move (captionText))
+{
+    value = clamp01 (param.getValue());
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+int Toggle::getPreferredWidth() const
+{
+    if (caption.isEmpty())
+        return kPillWidth;
+
+    // Fonts are not available to measure at construction time, so estimate
+    // generously: the caption is short and always left of the switch.
+    return caption.length() * 6 + 10 + kPillWidth;
+}
+
+void Toggle::paint (juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+    const bool on = isOn();
+
+    auto pill = juce::Rectangle<float> (bounds.getRight() - (float) kPillWidth,
+                                        bounds.getCentreY() - (float) kPillHeight * 0.5f,
+                                        (float) kPillWidth, (float) kPillHeight);
+
+    if (caption.isNotEmpty())
+    {
+        const float captionRight = pill.getX() - 8.0f;
+        if (captionRight > bounds.getX() + 4.0f)
+        {
+            auto captionArea = juce::Rectangle<float> (bounds.getX(), pill.getY(),
+                                                      captionRight - bounds.getX(), pill.getHeight());
+            g.setColour (on ? col::textDim : col::textFaint);
+            g.setFont (font (9.5f, true));
+            g.drawText (caption, captionArea.toNearestInt(), juce::Justification::centredRight, false);
+        }
+    }
+
+    auto base = on ? col::accent.withAlpha (pressed ? 0.34f : 0.20f)
+                   : (hover ? col::panelRaised.brighter (0.07f) : col::panelDeep);
+    if (pressed)
+        base = base.darker (0.15f);
+
+    g.setColour (base);
+    g.fillRoundedRectangle (pill, pill.getHeight() * 0.5f);
+    g.setColour (on ? col::accent : col::lineSoft);
+    g.drawRoundedRectangle (pill.reduced (0.5f), pill.getHeight() * 0.5f, on ? 1.4f : 1.0f);
+
+    // LED
+    const auto led = juce::Rectangle<float> (7.0f, 7.0f)
+                         .withCentre ({ pill.getX() + 11.0f, pill.getCentreY() });
+    if (on)
+    {
+        g.setColour (col::led.withAlpha (0.22f));
+        g.fillEllipse (led.expanded (3.5f));
+    }
+    g.setColour (on ? col::led : col::line);
+    g.fillEllipse (led);
+
+    g.setColour (on ? col::accentBright : (hover ? col::text : col::textFaint));
+    g.setFont (font (10.0f, on));
+    g.drawText (on ? "ON" : "OFF",
+                pill.withTrimmedLeft (19.0f).toNearestInt(),
+                juce::Justification::centred, false);
+}
+
+void Toggle::mouseUp (const juce::MouseEvent&)
+{
+    const bool wasPressed = pressed;
+    pressed = false;
+    repaint();
+
+    if (wasPressed)
+        attachment.setValueAsCompleteGesture (isOn() ? 0.0f : 1.0f);
+}
+
+// ---------------------------------------------------------------------------
 // SimpleButton
 // ---------------------------------------------------------------------------
 

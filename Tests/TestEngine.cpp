@@ -376,6 +376,139 @@ void runGateBypassIsNeutral()
     e.allNotesOff (true);
 }
 
+void runSectionSwitches()
+{
+    auto& e = engine();
+
+    // A bare, steady pad so each switch can be measured on its own.
+    auto configureBare = [&e]
+    {
+        resetToDefaults (e);
+        auto& p = e.params();
+        p.set (mk::P::NoiseLevel, 0.0f);
+        p.set (mk::P::ReverbMix, 0.0f);
+        p.set (mk::P::DelayMix, 0.0f);
+        p.set (mk::P::EnsembleDepth, 0.0f);
+        p.set (mk::P::PadSpace, 0.0f);
+        p.set (mk::P::Lfo1Cutoff, 0.0f);
+        p.set (mk::P::Lfo2Cutoff, 0.0f);
+        p.set (mk::P::Lfo3Cutoff, 0.0f);
+        p.set (mk::P::AmpAttack, 0.02f);
+        p.set (mk::P::AmpSustain, 1.0f);
+        p.snapToTargets();
+    };
+
+    // ---- oscillators -------------------------------------------------------
+    configureBare();
+    e.noteOn (60, 0.9f);
+    const auto oscillatorsOn = render (e, 1.0);
+    e.allNotesOff (true);
+
+    configureBare();
+    e.params().set (mk::P::OscAOn, 0.0f);
+    e.params().set (mk::P::OscBOn, 0.0f);
+    e.params().snapToTargets();
+    e.noteOn (60, 0.9f);
+    const auto oscillatorsOff = render (e, 1.0);
+    e.allNotesOff (true);
+
+    CHECK_MSG (rms (oscillatorsOn.l(), oscillatorsOn.size()) > 0.005, "oscillators must be audible when on");
+    CHECK_MSG (rms (oscillatorsOff.l(), oscillatorsOff.size())
+                   < rms (oscillatorsOn.l(), oscillatorsOn.size()) * 0.02,
+               "switching both oscillators off must mute the pad");
+
+    // ---- texture slot ------------------------------------------------------
+    auto textureOnly = [&e]
+    {
+        auto& p = e.params();
+        p.set (mk::P::PadLevel, 0.0f);
+        p.set (mk::P::NoiseLevel, 1.0f);
+        p.set (mk::P::Slot1Source, 2.0f); // brown noise
+        p.set (mk::P::Slot1Level, 0.8f);
+        p.set (mk::P::Slot1Swell, 0.05f);
+        p.snapToTargets();
+    };
+
+    configureBare();
+    textureOnly();
+    e.noteOn (60, 0.9f);
+    const auto slotOn = render (e, 1.0);
+    e.allNotesOff (true);
+
+    configureBare();
+    textureOnly();
+    e.params().set (mk::P::Slot1On, 0.0f);
+    e.params().snapToTargets();
+    e.noteOn (60, 0.9f);
+    const auto slotOff = render (e, 1.0);
+    e.allNotesOff (true);
+
+    CHECK_MSG (rms (slotOn.l(), slotOn.size()) > 0.001, "texture slot must be audible when on");
+    CHECK_MSG (rms (slotOff.l(), slotOff.size()) < 1.0e-4, "switching a texture slot off must mute it");
+
+    // ---- gate --------------------------------------------------------------
+    auto silenceSteps = [&e]
+    {
+        auto& p = e.params();
+        p.set (mk::P::GateMix, 1.0f);
+        p.set (mk::P::GateTrigger, 1.0f); // free rate
+        p.set (mk::P::GateRate, 2.0f);
+        p.set (mk::P::GateTarget, 0.0f);  // pad
+        p.set (mk::P::GateMin, 0.0f);
+        p.set (mk::P::GateMax, 1.0f);
+        p.set (mk::P::GateAttack, 0.004f);
+        p.set (mk::P::GateRelease, 0.006f);
+        for (int i = 0; i < mk::kGateSteps; ++i)
+            p.set (mk::gateStepParam (i), 0.0f);
+        p.snapToTargets();
+    };
+
+    configureBare();
+    silenceSteps();
+    e.noteOn (60, 0.9f);
+    const auto gated = render (e, 1.0);
+    e.allNotesOff (true);
+
+    configureBare();
+    silenceSteps();
+    e.params().set (mk::P::GateOn, 0.0f);
+    e.params().snapToTargets();
+    e.noteOn (60, 0.9f);
+    const auto gateOff = render (e, 1.0);
+    e.allNotesOff (true);
+
+    CHECK_MSG (rms (gated.l(), gated.size()) < 1.0e-4, "an all-zero pattern must gate the pad to silence");
+    CHECK_MSG (rms (gateOff.l(), gateOff.size()) > 0.005, "switching the gate off must bypass the pattern");
+
+    // ---- reverb ------------------------------------------------------------
+    // Measured on the tail: once the texture has faded, only the reverb return
+    // can still be heard, so a working switch leaves measurable silence.
+    auto reverbTail = [&e, &configureBare, &textureOnly] (bool reverbOn)
+    {
+        configureBare();
+        textureOnly();
+        auto& p = e.params();
+        p.set (mk::P::Slot1RevSend, 1.0f);
+        p.set (mk::P::ReverbMix, 1.0f);
+        p.set (mk::P::ReverbDecay, 0.5f);
+        p.set (mk::P::ReverbOn, reverbOn ? 1.0f : 0.0f);
+        p.snapToTargets();
+
+        e.noteOn (60, 0.9f);
+        render (e, 1.0);
+        e.allNotesOff (false);
+
+        const auto tail = render (e, 2.0);
+        const int window = (int) (0.25 * kHostRate);
+        return rms (tail.l() + tail.size() - window, window);
+    };
+
+    const double reverbTailOn = reverbTail (true);
+    const double reverbTailOff = reverbTail (false);
+    CHECK_MSG (reverbTailOn > 1.0e-4, "reverb return must be audible when on");
+    CHECK_MSG (reverbTailOff < 1.0e-5, "switching the reverb off must mute its return");
+}
+
 void runPerformance()
 {
     auto& e = engine();
@@ -411,6 +544,7 @@ void runEngineTests()
     runLongTailDecay();
     runGateInEngine();
     runGateBypassIsNeutral();
+    runSectionSwitches();
     runPerformance();
 }
 

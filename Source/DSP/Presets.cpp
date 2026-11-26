@@ -90,14 +90,13 @@ struct Patch
     Patch& lfo (int index, float rate, int shape, float toCutoff, float toDetune,
                 float toBlend, float toPan, float toSpace)
     {
-        const int base = (int) P::Lfo1Rate + index * 7;
-        set ((P) base, rate);
-        set ((P) (base + 1), (float) shape);
-        set ((P) (base + 2), toCutoff);
-        set ((P) (base + 3), toDetune);
-        set ((P) (base + 4), toBlend);
-        set ((P) (base + 5), toPan);
-        set ((P) (base + 6), toSpace);
+        set (lfoParam (index, 0), rate);
+        set (lfoParam (index, 1), (float) shape);
+        set (lfoParam (index, 2), toCutoff);
+        set (lfoParam (index, 3), toDetune);
+        set (lfoParam (index, 4), toBlend);
+        set (lfoParam (index, 5), toPan);
+        set (lfoParam (index, 6), toSpace);
         return *this;
     }
 
@@ -696,7 +695,7 @@ void applyMood (ParamSnapshot& s, const Mood& m)
     scale (P::OscBDetune, m.detune);
 
     for (int i = 0; i < 3; ++i)
-        scale ((P) ((int) P::Lfo1Rate + i * 7), m.motion);
+        scale (lfoParam (i, 0), m.motion);
 
     scale (P::ReverbSize, 0.75f + 0.25f * m.space);
     scale (P::ReverbDecay, m.space);

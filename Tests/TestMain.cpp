@@ -49,6 +49,22 @@ void runStaticTests()
     CHECK (mk::slotSourceRangeIsValid());
     CHECK (mk::slotSourceChoices().count == mk::kNumProceduralSources + mk::kNumSampleSources);
 
+    // Every section switch is a plain 0..1 control that defaults to on, so an
+    // old patch or a fresh instance always starts with everything enabled.
+    int switchCount = 0;
+    for (int i = 0; i < mk::kParamCount; ++i)
+    {
+        const auto& spec = mk::paramSpecByIndex (i);
+        if (spec.unit != mk::U_Switch)
+            continue;
+
+        ++switchCount;
+        CHECK_NEAR (spec.minValue, 0.0f, 1e-6);
+        CHECK_NEAR (spec.maxValue, 1.0f, 1e-6);
+        CHECK_NEAR (spec.defaultValue, 1.0f, 1e-6);
+    }
+    CHECK_MSG (switchCount == 13, "osc A/B, four slots, three LFOs, delay, reverb, ensemble and gate all switch");
+
     // Slot blocks are contiguous and every slot maps onto real parameters.
     for (int slot = 0; slot < mk::kNoiseSlotCount; ++slot)
     {
